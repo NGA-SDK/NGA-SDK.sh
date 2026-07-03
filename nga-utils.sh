@@ -210,26 +210,44 @@ is_kernelsu() { [ "$KSU" = true ]; }
 is_ap() { [ "$APATCH" = true ]; }
 is_apatch() { [ "$APATCH" = true ]; }
 
-not_magisk() { is_ssu || is_ksu || is_ap; }
-
-is_magisk() { ! not_magisk; }
+is_magisk() { run2null which magisk; }
 
 nga_install_module() {
 	local zipPath="$1"
 
-	run2null which magisk && {
+	is_shirosu && {
+		suu mod install "$zipPath"
+		return
+	}
+	is_magisk && {
 		magisk --install-module "$zipPath"
 		return
 	}
-	for us in apd ksud; do
-		{ run2null which $us && {
-			$us module install "$zipPath"
+
+	__run_ksud_like() {
+		unset -f __run_ksud_like
+		local us="$1"
+
+		{ run2null which "$us" && {
+			"$us" module install "$zipPath"
 			return
-		}; } || { [ -f /data/adb/$us ] && {
-			/data/adb/$us module install "$zipPath"
+		}; } || { [ -f "/data/adb/$us" ] && {
+			"/data/adb/$us" module install "$zipPath"
 			return
 		}; }
-	done
+		return 1
+	}
+	is_apatch && {
+		__run_ksud_like apd
+		return
+	}
+	is_kernelsu && {
+		__run_ksud_like ksud
+		return
+	}
+
+	unset -f __run_ksud_like
+	return 1
 }
 
 nga_install_modules() { for zipPath in "$@"; do nga_install_module "$zipPath"; done; }
